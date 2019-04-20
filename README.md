@@ -1,20 +1,12 @@
-# cross_interpolation
-Python3.6 + Pytorch 1.0 + ipython + ujson + tqdm + argparse
+# ACAI (1807.07543) Pytorch Implementation based on [kylemcdonald's gist](https://gist.github.com/kylemcdonald/e8ca989584b3b0e6526c0a737ed412f0)
+Python3.6 + Pytorch 1.0
 
+Setup:
 ``` Bash
-virtualenv -p /usr/bin/python3.6 ../py36+pytorch1
-source ../py36+pytorch1/bin/activate
-bash requirement.sh
-```
-
-To use tensorboardX, need to install tensorflow first : 
-``` Bash
-pip3 install --upgrade tensorflow-gpu==1.4.1 # cuda 8.0
-```
-
-Install tensorboardX
-``` Bash
-pip3 install tensorboardX
+virtualenv -p /usr/bin/python3.6 ./py36+pytorch1
+source ./py36+pytorch1/bin/activate
+pip install https://download.pytorch.org/whl/cu80/torch-1.0.0-cp36-cp36m-linux_x86_64.whl
+pip install -r requirement.txt
 ```
 
 To visualize and remote visualize : 

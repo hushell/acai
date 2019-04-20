@@ -51,7 +51,7 @@ def make_sample_grid_and_save(encoder_x, decoder_mix, data_loader, image_dir=Non
 	with torch.no_grad():
 		# Gather photos of size NxCxHxW
 		photos, _ = next(iter(data_loader))
-        photos = photos.cuda() # TODO: to(device)
+		photos = photos.cuda() # TODO: to(device)
 		if batch_size <= photos.size(0):
 			photos = photos[:batch_size]
 		else:
@@ -62,6 +62,7 @@ def make_sample_grid_and_save(encoder_x, decoder_mix, data_loader, image_dir=Non
 		Nx, Cx, Wx, Hx = latents_x.size()
 		latents_x = latents_x.view(Nx, -1)
 		latents_s = latents_x.flip(0)
+		Ns, Cs, Ws, Hs = Nx, Cx, Wx, Hx
 
 
 		# Interpolate the latent vectors (lerp and slerp)
@@ -82,8 +83,8 @@ def make_sample_grid_and_save(encoder_x, decoder_mix, data_loader, image_dir=Non
 		images_slerp = images_slerp.view(interpolation, batch_size, images_slerp.size(1), images_slerp.size(2), images_slerp.size(3)).transpose(0, 1)
 
 		# Concatenate the sketches at the first column and the photos at the last column
-		images_lerp = torch.cat((sketches.unsqueeze(1), images_lerp, photos.unsqueeze(1)), 1)
-		images_slerp = torch.cat((sketches.unsqueeze(1), images_slerp, photos.unsqueeze(1)), 1)
+		images_lerp = torch.cat((images_lerp, photos.unsqueeze(1)), 1)
+		images_slerp = torch.cat((images_slerp, photos.unsqueeze(1)), 1)
 
 		# Convert the grid of images to a single image with value in [0, 255]
 		image_lerp = to_png(images_to_grid(images_lerp))

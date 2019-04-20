@@ -3,8 +3,9 @@
 import argparse
 import itertools
 import os
-import ujson
-from tqdm import tqdm
+import random
+#import ujson
+#from tqdm import tqdm
 import numpy as np
 from tensorboardX import SummaryWriter # import tensorboard
 import torch
@@ -21,11 +22,12 @@ from model import Encoder, Decoder, Discriminator
 ##########################################################################
 ## Configs
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', required=True, help='cifar10 | lsun | mnist |imagenet | folder | lfw | fake')
-parser.add_argument('--dataroot', type=str, default='./datasets' help='path to dataset')
+parser.add_argument('--dataset', type=str, default='mnist', help='cifar10 | lsun | mnist')
+parser.add_argument('--dataroot', type=str, default='./datasets', help='path to dataset')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
 parser.add_argument('--nEpochs', type=int, default=200, help='number of epochs of training')
 parser.add_argument('--batchSize', type=int, default=64, help='size of the batches')
+parser.add_argument('--imageSize', type=int, default=32, help='the height / width of the input image to network')
 parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')
 parser.add_argument('--gpu_id', type=int, default=0, help='which GPU')
 parser.add_argument('--resumeDir', type=str, help='Resume directory')
@@ -35,6 +37,7 @@ parser.add_argument('--depth', type=int, default = 64, help='depth in the autoen
 parser.add_argument('--latent', type=int, default = 2, help='depth in the autoencoder')
 parser.add_argument('--reg', type=float, default = 0.2, help='hyper parameter lambda in the paper')
 parser.add_argument('--sweight', type=float, default = 0.5, help='weight of sketch AE loss')
+parser.add_argument('--manualSeed', type=int, help='manual seed')
 
 opt = parser.parse_args()
 print(opt)
@@ -89,8 +92,8 @@ dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize,
 ##########################################################################
 ## Networks
 discriminator = Discriminator(opt.scale, opt.depth, opt.latent, nc).to(device)
-encoder = EncoderSimple(opt.scale, opt.depth, opt.latent, nc).to(device)
-decoder = DecoderSimple(opt.scale, opt.depth, opt.latent, nc).to(device)
+encoder = Encoder(opt.scale, opt.depth, opt.latent, nc).to(device)
+decoder = Decoder(opt.scale, opt.depth, opt.latent, nc).to(device)
 
 if opt.resumeDir:
     msg = 'Loading pretrained model from {}'.format(opt.resumeDir)
@@ -122,7 +125,7 @@ for epoch in range(opt.nEpochs):
     GAE = np.zeros(len(dataloader))
     GReg = np.zeros(len(dataloader))
     G = np.zeros(len(dataloader))
-    DAlpha = np.zeros(len(dataloader))
+    DFit = np.zeros(len(dataloader))
     DMix = np.zeros(len(dataloader))
     D = np.zeros(len(dataloader))
 
@@ -132,7 +135,7 @@ for epoch in range(opt.nEpochs):
 
 	# Autoencoder with interpolation
         z = encoder(image)
-        alpha = torch.rand(opt.batchSize, 1, 1, 1, device=device).expand_as(z)
+        alpha = torch.rand(image.shape[0], 1, 1, 1, device=device)#.expand_as(z)
         z_mix = alpha * z + (1 - alpha) * z.flip(0)
         image_alpha = decoder(z_mix)
         disc_alpha = discriminator(image_alpha)
@@ -147,7 +150,7 @@ for epoch in range(opt.nEpochs):
 
 	# Discriminator
         z = encoder(image)
-        alpha = torch.rand(opt.batchSize, 1, 1, 1, device=device).expand_as(z)
+        alpha = torch.rand(image.shape[0], 1, 1, 1, device=device)#.expand_as(z)
         z_mix = alpha * z + (1 - alpha) * z.flip(0)
         image_alpha = decoder(z_mix)
         disc_alpha = discriminator(image_alpha)
@@ -167,25 +170,25 @@ for epoch in range(opt.nEpochs):
         GAE[i] = loss_ae.item()
         GReg[i] = loss_reg.item()
         G[i] = lossG.item()
-        DAlpha[i] = loss_fit.item()
+        DFit[i] = loss_fit.item()
         DMix[i] = loss_mix.item()
         D[i] = lossD.item()
 
         # Print information
         if i % 100 == 99 :
-            msg = '\nEpoch {:d}, Batch {:d}, G {:.4f}, [G/AE {:.4f}], [G/Reg {:.4f}], D {:.4f}, [D/fitting {:.4f}], [D/Mix {:.4f}]'.format(
+            msg = '\nEpoch {:d}, Batch {:d} ## G {:.4f}, [G/AE {:.4f}], [G/Reg {:.4f}] ## D {:.4f}, [D/fitting {:.4f}], [D/Mix {:.4f}]'.format(
                     epoch, i + 1,
                     G[:i+1].mean(), GAE[:i+1].mean(), GReg[:i+1].mean(),
-                    D[:i+1].mean(), DAlpha[:i+1].mean(), DMix[:i+1].mean())
+                    D[:i+1].mean(), DFit[:i+1].mean(), DMix[:i+1].mean())
             print (msg)
 
     # Save train loss for one epoch
     writer.add_scalar('G/AE', np.mean(GAE), epoch)
     writer.add_scalar('G/Reg', np.mean(GReg), epoch)
     writer.add_scalar('G/G', np.mean(G), epoch)
-    writer.add_scalar('D/Fit', np.mean(L2DiscG), epoch)
-    writer.add_scalar('D/Mix', np.mean(L2AlphaReg), epoch)
-    writer.add_scalar('D/D', np.mean(L2AlphaReg), epoch)
+    writer.add_scalar('D/Fit', np.mean(DFit), epoch)
+    writer.add_scalar('D/Mix', np.mean(DMix), epoch)
+    writer.add_scalar('D/D', np.mean(D), epoch)
 
     # Save images
     linearInterImg, sphereInterImg = make_sample_grid_and_save(encoder, decoder, dataloader)

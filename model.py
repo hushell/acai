@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 activation = nn.LeakyReLU
@@ -39,7 +40,7 @@ def Decoder(scales, depth, latent, colors):
         layers.extend([nn.Conv2d(k, k, 3, padding=1), activation()])
         layers.append(nn.Upsample(scale_factor=2))
         kp = k
-    layers.extend([nn.Conv2d(kp, depth, 3, padding=1, bias=True), activation()])
+    layers.extend([nn.Conv2d(kp, depth, 3, padding=1), activation()])
     layers.append(nn.Conv2d(depth, colors, 3, padding=1, bias=True))
     Initializer(layers)
     return nn.Sequential(*layers)
@@ -54,15 +55,17 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         self.encoder = Encoder(scales, depth, latent, colors)
-        self.fc = torch.nn.Linear(depth << (scales-1), 1)
-        self.fc = Initializer([self.fc])
-        self.sigmoid = torch.nn.Sigmoid()
+        #self.fc = torch.nn.Linear(latent, 1)
+        #Initializer([self.fc])
+        #self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self, x):
         x = self.encoder(x)
-        x = torch.mean(torch.mean(x, dim = 2), dim = 2)
-        x = self.fc(x)
-        x = self.sigmoid(x)
+        #x = torch.mean(torch.mean(x, dim = 2), dim = 2)
+        #x = self.fc(x)
+        #x = self.sigmoid(x)
+        x = x.reshape(x.shape[0], -1)
+        x = torch.mean(x, -1)
         return x
 
 
