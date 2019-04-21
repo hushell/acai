@@ -29,15 +29,15 @@ parser.add_argument('--nEpochs', type=int, default=200, help='number of epochs o
 parser.add_argument('--batchSize', type=int, default=64, help='size of the batches')
 parser.add_argument('--imageSize', type=int, default=32, help='the height / width of the input image to network')
 parser.add_argument('--lr', type=float, default=0.0001, help='initial learning rate')
-parser.add_argument('--gpu_id', type=int, default=0, help='which GPU')
+parser.add_argument('--gpu_id', type=int, default=3, help='which GPU')
 parser.add_argument('--resumeDir', type=str, help='Resume directory')
-parser.add_argument('--outDir', type=str, default = 'outModel', help='output model directory')
+parser.add_argument('--outDir', type=str, default = 'outDir', help='output model directory')
 parser.add_argument('--scale', type=int, default=3, help='nb of downsampling in the autoencoder')
-parser.add_argument('--depth', type=int, default = 64, help='depth in the autoencoder')
+parser.add_argument('--depth', type=int, default = 16, help='depth in the autoencoder')
 parser.add_argument('--latent', type=int, default = 2, help='depth in the autoencoder')
 parser.add_argument('--reg', type=float, default = 0.2, help='hyper parameter lambda in the paper')
 parser.add_argument('--sweight', type=float, default = 0.5, help='weight of sketch AE loss')
-parser.add_argument('--manualSeed', type=int, help='manual seed')
+parser.add_argument('--manualSeed', type=int, default=100, help='manual seed')
 
 opt = parser.parse_args()
 print(opt)
@@ -135,25 +135,22 @@ for epoch in range(opt.nEpochs):
 
 	# Autoencoder with interpolation
         z = encoder(image)
+        image_hat = decoder(z)
         alpha = torch.rand(image.shape[0], 1, 1, 1, device=device)#.expand_as(z)
         z_mix = alpha * z + (1 - alpha) * z.flip(0)
         image_alpha = decoder(z_mix)
         disc_alpha = discriminator(image_alpha)
 
-        loss_ae = MSE(image_alpha, image)
+        loss_ae = MSE(image_hat, image)
         loss_reg = torch.mean(disc_alpha**2)
         lossG = loss_ae + loss_reg * opt.sweight
 
         optimizerG.zero_grad()
-        lossG.backward()
+        lossG.backward(retain_graph=True)
         optimizerG.step()
 
 	# Discriminator
-        z = encoder(image)
-        alpha = torch.rand(image.shape[0], 1, 1, 1, device=device)#.expand_as(z)
-        z_mix = alpha * z + (1 - alpha) * z.flip(0)
-        image_alpha = decoder(z_mix)
-        disc_alpha = discriminator(image_alpha)
+        #disc_alpha = discriminator(image_alpha)
 
         image_reg = image_alpha + opt.reg * (image - image_alpha)
         disc_reg = discriminator(image_reg)
